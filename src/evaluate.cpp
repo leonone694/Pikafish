@@ -159,8 +159,9 @@ namespace {
   // ThreatByMinor/ByRook[attacked PieceType] contains bonuses according to
   // which piece type attacks which one. Attacks on lesser pieces which are
   // pawn-defended are not considered.
-  // Index: NO_PIECE_TYPE=0, ROOK=1, ADVISOR=2, CANNON=3, PAWN=4, KNIGHT=5, BISHOP=6
-  // Increased ROOK threat values to prioritize capturing enemy rooks
+  // Array indexed by PieceType: 0=NO_PIECE_TYPE, 1=ROOK, 2=ADVISOR, 3=CANNON, 4=PAWN, 5=KNIGHT, 6=BISHOP
+  // Note: Array has 7 elements (indices 0-6), KING (index 7) is not included
+  // Increased ROOK (index 1) threat values to prioritize capturing enemy rooks
   Score ThreatByMinor[PIECE_TYPE_NB] = {
     S(0, 0), S(200, 200), S(-58, -109), S(73, -110), S(37, -89), S(-36, 319), S(-115, -96)
   };
