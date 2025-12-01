@@ -179,10 +179,8 @@ namespace {
   Score ProtectedByPawn     = S(51, -166);
   Score RestrictedDarkPawn  = S(87, -54);
   
-  // Penalty for enemy cannons on the same file as our king (空头炮 threat)
-  Score CannonOnKingFile    = S(120, 80);
-  // Additional penalty for two cannons on king file (double cannon battery)
-  Score DoubleCannonOnKingFile = S(250, 150);
+  // Penalty for 空头炮 (empty-headed cannon) - cannon facing our king with no pieces between
+  Score EmptyHeadedCannon   = S(150, 100);
 
 #undef S
 
@@ -392,26 +390,23 @@ namespace {
 
     // Penalty for 空头炮 (empty-headed cannon) - cannon directly facing our king with no pieces between
     // This is a very dangerous threat because any piece moving into the line creates a cannon mount for checkmate
+    // Note: By definition, there can only be one 空头炮 on the king's file at a time
     Square ksq = pos.square<KING>(Us);
     Bitboard kingFile = file_bb(ksq);
     Bitboard enemyCannonsOnKingFile = pos.pieces(Them, CANNON) & kingFile;
     
     // Check each cannon on the king's file to see if it's truly an empty-headed cannon
     // (no pieces between cannon and king)
-    Bitboard allPieces = pos.pieces();  // Cache for efficiency
+    Bitboard allPieces = pos.pieces();
     Bitboard cannons = enemyCannonsOnKingFile;
-    int emptyHeadedCannonCount = 0;
     while (cannons) {
         Square cannonSq = pop_lsb(cannons);
         // True 空头炮: no pieces between cannon and king
-        if (!(between_bb(ksq, cannonSq) & allPieces))
-            emptyHeadedCannonCount++;
+        if (!(between_bb(ksq, cannonSq) & allPieces)) {
+            score -= EmptyHeadedCannon;
+            break;  // Only one empty-headed cannon possible per file
+        }
     }
-    
-    if (emptyHeadedCannonCount >= 2)
-        score -= DoubleCannonOnKingFile;  // Double empty-headed cannon is extremely dangerous
-    else if (emptyHeadedCannonCount == 1)
-        score -= CannonOnKingFile;  // Single empty-headed cannon is a serious threat
 
     if constexpr (T)
         Trace::add(THREAT, Us, score);
