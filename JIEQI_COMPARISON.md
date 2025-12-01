@@ -93,6 +93,10 @@ restPieces[pc] = token - '0';
 
 ## NNUE Usage
 
+### ⚠️ Important Limitation: No Official Jieqi NNUE Available
+
+**Currently, there is no official Jieqi-specific NNUE file released by Pikafish.** This is a significant limitation for practical use of the current `jieqi` branch.
+
 ### Current Branch (Requires NNUE)
 
 The current `jieqi` branch **requires NNUE** for evaluation. The evaluation function is fully NNUE-based:
@@ -106,9 +110,12 @@ Value Eval::evaluate(const Eval::NNUE::Networks& networks, ...) {
 }
 ```
 
-You need to provide a valid NNUE file (`pikafish.nnue` or via `EvalFile` UCI option) for the engine to work.
+The engine expects a NNUE file (`pikafish.nnue` or via `EvalFile` UCI option), but:
+- The standard Pikafish NNUE is trained for regular Xiangqi, not Jieqi
+- Using the regular Xiangqi NNUE for Jieqi may produce suboptimal or incorrect evaluations
+- A Jieqi-specific NNUE would need to be trained separately
 
-### `jieqi_old` Branch (NNUE Optional)
+### `jieqi_old` Branch (NNUE Optional) - Recommended for Now
 
 The `jieqi_old` branch has a conditional NNUE flag:
 
@@ -117,7 +124,11 @@ The `jieqi_old` branch has a conditional NNUE flag:
 #define USE_NNUEEVAL 0  // 0 = disabled, 1 = enabled
 ```
 
-When `USE_NNUEEVAL` is 0, the engine uses classical evaluation instead of NNUE.
+When `USE_NNUEEVAL` is 0, the engine uses classical evaluation instead of NNUE. **This makes `jieqi_old` more practical for Jieqi use until a Jieqi-specific NNUE is available.**
+
+## Recommendation
+
+**For practical Jieqi engine use, consider using the `jieqi_old` branch** with `USE_NNUEEVAL=0` (classical evaluation) until a Jieqi-specific NNUE network is trained and released.
 
 ## Troubleshooting: Engine Not Behaving as Jieqi Engine
 
