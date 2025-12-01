@@ -395,16 +395,16 @@ namespace {
     Square ksq = pos.square<KING>(Us);
     Bitboard kingFile = file_bb(ksq);
     Bitboard enemyCannonsOnKingFile = pos.pieces(Them, CANNON) & kingFile;
-    int emptyHeadedCannonCount = 0;
     
     // Check each cannon on the king's file to see if it's truly an empty-headed cannon
     // (no pieces between cannon and king)
+    Bitboard allPieces = pos.pieces();  // Cache for efficiency
     Bitboard cannons = enemyCannonsOnKingFile;
+    int emptyHeadedCannonCount = 0;
     while (cannons) {
         Square cannonSq = pop_lsb(cannons);
-        Bitboard between = between_bb(ksq, cannonSq);
         // True 空头炮: no pieces between cannon and king
-        if (!(between & pos.pieces()))
+        if (!(between_bb(ksq, cannonSq) & allPieces))
             emptyHeadedCannonCount++;
     }
     
