@@ -159,12 +159,14 @@ namespace {
   // ThreatByMinor/ByRook[attacked PieceType] contains bonuses according to
   // which piece type attacks which one. Attacks on lesser pieces which are
   // pawn-defended are not considered.
+  // Index: NO_PIECE_TYPE=0, ROOK=1, ADVISOR=2, CANNON=3, PAWN=4, KNIGHT=5, BISHOP=6
+  // Increased ROOK threat values to prioritize capturing enemy rooks
   Score ThreatByMinor[PIECE_TYPE_NB] = {
-    S(0, 0), S(-169, -94), S(-58, -109), S(73, -110), S(37, -89), S(-36, 319), S(-115, -96)
+    S(0, 0), S(200, 200), S(-58, -109), S(73, -110), S(37, -89), S(-36, 319), S(-115, -96)
   };
 
   Score ThreatByRook[PIECE_TYPE_NB] = {
-    S(0, 0), S(59, -229), S(-118, 45), S(-50, 84), S(56, 46), S(-13, -152), S(91, 22)
+    S(0, 0), S(180, 150), S(-118, 45), S(-50, 84), S(56, 46), S(-13, -152), S(91, 22)
   }; 
 
   // Assorted bonuses and penalties
@@ -175,6 +177,11 @@ namespace {
   Score ThreatBySafePawn    = S(11, 39);
   Score ProtectedByPawn     = S(51, -166);
   Score RestrictedDarkPawn  = S(87, -54);
+  
+  // Penalty for enemy cannons on the same file as our king (空头炮 threat)
+  Score CannonOnKingFile    = S(120, 80);
+  // Additional penalty for two cannons on king file (double cannon battery)
+  Score DoubleCannonOnKingFile = S(250, 150);
 
 #undef S
 
@@ -381,6 +388,17 @@ namespace {
         b = attackedBy[Us][BISHOP] & DarkPieces[Them][i];
         score += popcount(b) * ThreatByBishop[i];
     }
+
+    // Penalty for enemy cannons on the same file as our king (空头炮/Empty-headed cannon threat)
+    // This creates dangerous checkmate patterns
+    Square ksq = pos.square<KING>(Us);
+    Bitboard kingFile = file_bb(ksq);
+    Bitboard enemyCannonsOnKingFile = pos.pieces(Them, CANNON) & kingFile;
+    int cannonCount = popcount(enemyCannonsOnKingFile);
+    if (cannonCount >= 2)
+        score -= DoubleCannonOnKingFile;  // Double cannon battery is very dangerous
+    else if (cannonCount == 1)
+        score -= CannonOnKingFile;  // Single cannon on king file is a threat
 
     if constexpr (T)
         Trace::add(THREAT, Us, score);
