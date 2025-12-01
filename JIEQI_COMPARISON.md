@@ -83,12 +83,41 @@ restPieces[pc] = token - '0';
 - Has dedicated `RestList` class with more features (e.g., `evgValue()` for expected value)
 - Explicit dark depth limits (`MAXDARKDEPTH`, `QDARKDEPTH`)
 - Tuning parameters (`DARKVALRATE`, `DARKMAXDIFF`)
+- **NNUE is optional** via `USE_NNUEEVAL` flag (default: 0 = disabled)
 
 **Current `jieqi` approach:**
 - Uses `DARK` as a piece type directly
 - Simple array for rest piece counting
 - Probabilistic search integrated into main search with expected value calculations
-- Cleaner integration with newer NNUE architecture
+- **NNUE is required** - evaluation is fully NNUE-based
+
+## NNUE Usage
+
+### Current Branch (Requires NNUE)
+
+The current `jieqi` branch **requires NNUE** for evaluation. The evaluation function is fully NNUE-based:
+
+```cpp
+// In evaluate.cpp
+Value Eval::evaluate(const Eval::NNUE::Networks& networks, ...) {
+    auto [psqt, positional] = networks.big.evaluate(pos, accumulators, &caches.big);
+    Value nnue = psqt + positional;
+    // ... NNUE-based evaluation
+}
+```
+
+You need to provide a valid NNUE file (`pikafish.nnue` or via `EvalFile` UCI option) for the engine to work.
+
+### `jieqi_old` Branch (NNUE Optional)
+
+The `jieqi_old` branch has a conditional NNUE flag:
+
+```cpp
+// In types.h (jieqi_old)
+#define USE_NNUEEVAL 0  // 0 = disabled, 1 = enabled
+```
+
+When `USE_NNUEEVAL` is 0, the engine uses classical evaluation instead of NNUE.
 
 ## Troubleshooting: Engine Not Behaving as Jieqi Engine
 
