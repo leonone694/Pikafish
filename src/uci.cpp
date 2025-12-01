@@ -310,13 +310,14 @@ namespace {
     }
 
     sync_cout << "info string Starting selfplay: " << numGames << " game(s), "
-              << "depth=" << depth;
-    if (nodes > 0) cout << ", nodes=" << nodes;
-    if (movetime > 0) cout << ", movetime=" << movetime;
-    cout << sync_endl;
+              << "depth=" << depth
+              << (nodes > 0 ? ", nodes=" + to_string(nodes) : "")
+              << (movetime > 0 ? ", movetime=" + to_string(movetime) : "")
+              << sync_endl;
 
     int wins[2] = {0, 0};  // wins[0] = red wins, wins[1] = black wins
     int draws = 0;
+    Value repResult;  // Declared outside loop to avoid repeated initialization
 
     for (int game = 0; game < numGames; ++game)
     {
@@ -365,7 +366,6 @@ namespace {
             }
             
             // Check for repetition/draw
-            Value repResult;
             if (pos.is_repeated(repResult, 0)) {
                 if (repResult == VALUE_DRAW) {
                     result = "1/2-1/2";
