@@ -304,7 +304,8 @@ enum Value : int {
   KnightValueMg  = 707 ,  KnightValueEg  = 733 ,
   BishopValueMg  = 271 ,  BishopValueEg  = 191 ,
 
-  B_RookValueMg = 844, B_RookValueEg = 700,
+  // Dark (hidden) piece values - increased B_RookValueMg to penalize early rook exposure
+  B_RookValueMg = 1100, B_RookValueEg = 700,
   B_AdvisorValueMg = 139, B_AdvisorValueEg = 200,
   B_CannonValueMg = 647, B_CannonValueEg = 574,
   B_PawnValueMg = 305, B_PawnValueEg = 200,

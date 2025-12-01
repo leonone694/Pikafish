@@ -159,12 +159,15 @@ namespace {
   // ThreatByMinor/ByRook[attacked PieceType] contains bonuses according to
   // which piece type attacks which one. Attacks on lesser pieces which are
   // pawn-defended are not considered.
+  // Array indexed by PieceType: 0=NO_PIECE_TYPE, 1=ROOK, 2=ADVISOR, 3=CANNON, 4=PAWN, 5=KNIGHT, 6=BISHOP
+  // Note: Array has 7 elements (indices 0-6), KING (index 7) is not included
+  // Increased ROOK (index 1) threat values to prioritize capturing enemy rooks
   Score ThreatByMinor[PIECE_TYPE_NB] = {
-    S(0, 0), S(-169, -94), S(-58, -109), S(73, -110), S(37, -89), S(-36, 319), S(-115, -96)
+    S(0, 0), S(200, 200), S(-58, -109), S(73, -110), S(37, -89), S(-36, 319), S(-115, -96)
   };
 
   Score ThreatByRook[PIECE_TYPE_NB] = {
-    S(0, 0), S(59, -229), S(-118, 45), S(-50, 84), S(56, 46), S(-13, -152), S(91, 22)
+    S(0, 0), S(180, 150), S(-118, 45), S(-50, 84), S(56, 46), S(-13, -152), S(91, 22)
   }; 
 
   // Assorted bonuses and penalties
@@ -175,6 +178,9 @@ namespace {
   Score ThreatBySafePawn    = S(11, 39);
   Score ProtectedByPawn     = S(51, -166);
   Score RestrictedDarkPawn  = S(87, -54);
+  
+  // Penalty for 空头炮 (empty-headed cannon) - cannon facing our king with no pieces between
+  Score EmptyHeadedCannon   = S(150, 100);
 
 #undef S
 
@@ -380,6 +386,26 @@ namespace {
 
         b = attackedBy[Us][BISHOP] & DarkPieces[Them][i];
         score += popcount(b) * ThreatByBishop[i];
+    }
+
+    // Penalty for 空头炮 (empty-headed cannon) - cannon directly facing our king with no pieces between
+    // This is a very dangerous threat because any piece moving into the line creates a cannon mount for checkmate
+    // Note: By definition, there can only be one 空头炮 on the king's file at a time
+    Square ksq = pos.square<KING>(Us);
+    Bitboard kingFile = file_bb(ksq);
+    Bitboard enemyCannonsOnKingFile = pos.pieces(Them, CANNON) & kingFile;
+    
+    // Check each cannon on the king's file to see if it's truly an empty-headed cannon
+    // (no pieces between cannon and king)
+    Bitboard allPieces = pos.pieces();
+    Bitboard cannons = enemyCannonsOnKingFile;
+    while (cannons) {
+        Square cannonSq = pop_lsb(cannons);
+        // True 空头炮: no pieces between cannon and king
+        if (!(between_bb(ksq, cannonSq) & allPieces)) {
+            score -= EmptyHeadedCannon;
+            break;  // Only one empty-headed cannon possible per file
+        }
     }
 
     if constexpr (T)
