@@ -390,16 +390,28 @@ namespace {
         score += popcount(b) * ThreatByBishop[i];
     }
 
-    // Penalty for enemy cannons on the same file as our king (空头炮/Empty-headed cannon threat)
-    // This creates dangerous checkmate patterns
+    // Penalty for 空头炮 (empty-headed cannon) - cannon directly facing our king with no pieces between
+    // This is a very dangerous threat because any piece moving into the line creates a cannon mount for checkmate
     Square ksq = pos.square<KING>(Us);
     Bitboard kingFile = file_bb(ksq);
     Bitboard enemyCannonsOnKingFile = pos.pieces(Them, CANNON) & kingFile;
-    int cannonCount = popcount(enemyCannonsOnKingFile);
-    if (cannonCount >= 2)
-        score -= DoubleCannonOnKingFile;  // Double cannon battery is very dangerous
-    else if (cannonCount == 1)
-        score -= CannonOnKingFile;  // Single cannon on king file is a threat
+    int emptyHeadedCannonCount = 0;
+    
+    // Check each cannon on the king's file to see if it's truly an empty-headed cannon
+    // (no pieces between cannon and king)
+    Bitboard cannons = enemyCannonsOnKingFile;
+    while (cannons) {
+        Square cannonSq = pop_lsb(cannons);
+        Bitboard between = between_bb(ksq, cannonSq);
+        // True 空头炮: no pieces between cannon and king
+        if (!(between & pos.pieces()))
+            emptyHeadedCannonCount++;
+    }
+    
+    if (emptyHeadedCannonCount >= 2)
+        score -= DoubleCannonOnKingFile;  // Double empty-headed cannon is extremely dangerous
+    else if (emptyHeadedCannonCount == 1)
+        score -= CannonOnKingFile;  // Single empty-headed cannon is a serious threat
 
     if constexpr (T)
         Trace::add(THREAT, Us, score);
