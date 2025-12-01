@@ -1,10 +1,10 @@
 # Comparison between `jieqi` and `jieqi_old` Branches
 
-This document explains the differences between the `jieqi` branch (current) and the `jieqi_old` branch, and answers the question of why the compiled engine from the current branch is not a Jieqi (揭棋/暗棋) engine.
+This document explains the differences between the `jieqi` branch (current) and the `jieqi_old` branch, and addresses the question of whether the compiled engine from the current branch is a Jieqi (揭棋/暗棋) engine.
 
 ## Summary
 
-The current `jieqi` branch is based on a newer Pikafish/Stockfish codebase that has been updated significantly but **does not contain the Jieqi-specific features**. The `jieqi_old` branch contains the original Jieqi implementation with support for dark/unknown pieces.
+**Good news: The current `jieqi` branch IS a Jieqi engine!** It has been updated to a newer Pikafish/Stockfish codebase (2024) while maintaining Jieqi-specific features. The implementation approach differs from `jieqi_old`, but both branches support Jieqi gameplay.
 
 ## What is Jieqi (揭棋)?
 
@@ -13,107 +13,105 @@ Jieqi (揭棋), also known as Banqi (暗棋) or Dark Chess, is a variant of Xian
 - Players flip pieces to reveal them during the game
 - The game involves probabilistic reasoning about unknown pieces
 
-## Key Differences
+## Jieqi Features in Current Branch
 
-### 1. Jieqi Features in `jieqi_old` (Missing in Current Branch)
+The current branch has the following Jieqi-specific implementations:
 
-The `jieqi_old` branch contains these Jieqi-specific features that are **not present** in the current branch:
-
-#### Dark Pieces Support
+### Dark Pieces Support
 ```cpp
-// In types.h (jieqi_old)
-enum Dark { KNOWN, UNKNOWN, DARK_NB = 2 };
+// In types.h - DARK piece type
+NO_PIECE_TYPE, ROOK, ADVISOR, CANNON, PAWN, KNIGHT, BISHOP, KING, DARK, ...
+DARK_PIECE, PIECE_NB = DARK_PIECE
 
-// Dark piece handling
-#define USE_NNUEEVAL 0
-constexpr int DARKVALRATE = 2862;  // 5000-10000
-constexpr int DARKMAXDIFF = 4812;  // 500-5000
+// In position.h/cpp
+bool is_dark(Square s) const;  // Check if a square has a dark piece
+inline bool Position::is_dark(Square s) const { return pieces(DARK) & s; }
 ```
 
-#### Rest Pieces (Unplaced Pieces)
+### Rest Pieces Tracking
 ```cpp
-// In position.h/cpp (jieqi_old)
-RestList restPieces[COLOR_NB];  // Pieces not yet placed on the board
+// In position.h
+int restPieces[PIECE_NB];  // Track count of each piece type not yet revealed
 
-// Methods for handling dark pieces
-bool isDark(Square s) const;
-Dark Darkof(Square s) const;
-Dark Darkof(Piece p) const;
+// Access methods
+const int& rest_piece(Piece pc) const;
+int& rest_piece(Piece pc);
+std::vector<std::pair<Piece, int>> rest_pieces(Color c) const;
 ```
 
-#### Dark Search Depth
+### Piece Flipping/Revealing
 ```cpp
-// In position.h (jieqi_old)
-#define MAXDARKDEPTH    4
-#define QDARKDEPTH      1
-#define MAXDARKTYPES    43
-
-// State tracking for dark pieces
-int darkDepth;
-int darkTypes;
-int darkTypeIndex;
+// In position.cpp - Full flip implementation
+Piece do_flip(Square s, Piece pc, DirtyPiece* dp, const TranspositionTable* tt);
+void undo_flip(Square s, Piece fromPc);
 ```
 
-#### Piece Flipping/Revealing
+### Probabilistic Search for Dark Pieces
 ```cpp
-// In position.cpp (jieqi_old)
-bool getDark(StateInfo& newSt, int& typecount, bool& isDarkDepth);
-void setDark();
-bool gives_check(Move m, PieceType flipped);  // Support for flipped pieces
+// In search.cpp - Handles flip scenarios during search
+auto restPieces = pos.rest_pieces(~pos.side_to_move());
+for (auto& [piece, num] : restPieces) {
+    Piece flipped_piece = pos.do_flip((ss - 1)->currentMove.to_sq(), piece, &dp, &tt);
+    Value value = search<nodeType>(pos, ss, alpha, beta, depth, cutNode);
+    pos.undo_flip((ss - 1)->currentMove.to_sq(), flipped_piece);
+    results.push_back({value, num});
+}
 ```
 
-### 2. Codebase Differences
+### FEN Format Support
+```cpp
+// In position.cpp - Parsing rest pieces from FEN
+// Format includes rest piece counts like "R2A2C2P5..." at the end
+restPieces[pc] = token - '0';
+```
+
+## Key Differences Between Branches
 
 | Aspect | `jieqi_old` | `jieqi` (Current) |
 |--------|-------------|-------------------|
-| Stockfish Base | 2022 version | 2025 version |
-| NNUE Support | Conditional (`USE_NNUEEVAL`) | Always enabled |
-| Dark Pieces | Full implementation | Partial (type defined but not used) |
-| Rest Pieces | Full tracking | Not implemented |
-| Search | Modified for dark pieces | Standard Xiangqi search |
-| Evaluation | Handles unknown pieces | Standard evaluation |
+| Stockfish Base | ~2022 version | 2024 version |
+| NNUE Support | Conditional (`USE_NNUEEVAL`) | Integrated with NNUE |
+| Dark Piece Enum | `enum Dark { KNOWN, UNKNOWN }` | Using `DARK` PieceType |
+| Rest Pieces | `RestList` class | `int restPieces[PIECE_NB]` array |
+| Search Integration | Custom dark depth tracking | Integrated in main search |
+| Flipping | `getDark()`/`setDark()` | `do_flip()`/`undo_flip()` |
 
-### 3. Why the Compiled Engine is Not a Jieqi Engine
+### Implementation Approach Differences
 
-When you compile the current branch, you get a standard Xiangqi engine because:
+**`jieqi_old` approach:**
+- Uses separate `Dark` enum to track known/unknown status
+- Has dedicated `RestList` class with more features (e.g., `evgValue()` for expected value)
+- Explicit dark depth limits (`MAXDARKDEPTH`, `QDARKDEPTH`)
+- Tuning parameters (`DARKVALRATE`, `DARKMAXDIFF`)
 
-1. **No Dark Piece Logic**: While `DARK` is defined as a piece type in `types.h`, the logic for handling unknown/dark pieces is not implemented.
+**Current `jieqi` approach:**
+- Uses `DARK` as a piece type directly
+- Simple array for rest piece counting
+- Probabilistic search integrated into main search with expected value calculations
+- Cleaner integration with newer NNUE architecture
 
-2. **No Rest Pieces Tracking**: The `RestList` and related functionality for tracking pieces that haven't been placed/revealed is missing.
+## Troubleshooting: Engine Not Behaving as Jieqi Engine
 
-3. **No Probabilistic Search**: The search algorithm doesn't account for the probabilistic nature of dark pieces.
+If the compiled engine doesn't seem to work as a Jieqi engine, check:
 
-4. **Standard Evaluation**: The evaluation function doesn't consider unknown pieces or calculate expected values for dark positions.
+1. **FEN String Format**: Ensure you're using the correct Jieqi FEN format that includes rest piece information at the end
 
-## What Needs to Be Done
+2. **UCI Interface**: Make sure your GUI supports Jieqi-specific FEN and moves
 
-To convert the current branch into a Jieqi engine, you would need to:
+3. **Initial Position**: Verify the starting position has dark pieces and rest piece counts set correctly
 
-1. **Port the Dark Piece Implementation** from `jieqi_old`:
-   - Add `Dark` enum with `KNOWN`/`UNKNOWN` states
-   - Implement `isDark()`, `Darkof()` methods in Position class
-   - Add dark piece handling in move generation
+4. **Move Format**: Jieqi moves may include flip information (e.g., a character indicating the revealed piece)
 
-2. **Port the Rest Pieces System**:
-   - Add `RestList` class for tracking unplaced pieces
-   - Implement piece flipping/revealing logic
-   - Add expected value calculations for unknown pieces
+## Example Jieqi FEN
 
-3. **Modify the Search Algorithm**:
-   - Add dark depth tracking
-   - Implement probabilistic search for unknown pieces
-   - Handle piece reveal scenarios
-
-4. **Adapt the Evaluation**:
-   - Handle evaluation of positions with unknown pieces
-   - Calculate expected values based on remaining piece probabilities
-
-## Recommendation
-
-If you need a working Jieqi engine, use the `jieqi_old` branch. The current `jieqi` branch appears to be an attempt to update the codebase to newer Pikafish/Stockfish but the Jieqi features have not been fully ported yet.
+A Jieqi position FEN includes rest piece counts after the standard position:
+```
+rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1 R2A2C2P5K1N2B2r2a2c2p5k1n2b2
+```
+The trailing part `R2A2C2P5K1N2B2r2a2c2p5k1n2b2` indicates the count of each unrevealed piece type.
 
 ## References
 
-- `jieqi_old` branch: Contains full Jieqi implementation (commit `23b9466c`)
-- `jieqi` branch: Updated codebase without Jieqi features (commit `9b963f72`)
-- Original Jieqi commits: "增加暗棋，随机棋子" (add dark chess, random pieces)
+- `jieqi_old` branch: Original Jieqi implementation (commit `23b9466c`)
+- `jieqi` branch: Updated codebase with Jieqi features (commit `9b963f72`)
+- Key files: `src/position.cpp`, `src/search.cpp`, `src/types.h`
