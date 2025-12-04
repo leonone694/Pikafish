@@ -107,9 +107,7 @@ constexpr bool Is64Bit = false;
 constexpr int DARKVALRATE = 2862;//5000-10000
 constexpr int DARKMAXDIFF = 4812;//500-5000
 
-inline bool is_dark_piece(Piece pc){
-    return (pc & 16) != 0;
-}
+
 // For chasing detection
 union ChaseMap {
     uint64_t attacks[4] { };
@@ -118,7 +116,7 @@ union ChaseMap {
     // For adding victim <- attacker pair
     void operator |= (int id) {
         attacks[id >> 6] |= 1ULL << (id & 63);
-    }
+}
 
     // For exact diff
     ChaseMap& operator & (const ChaseMap &rhs) {
@@ -345,6 +343,9 @@ inline Value PieceValue[PHASE_NB][PIECE_NB] = {
 
 typedef int Depth;
 
+inline bool is_dark_piece(Piece pc){
+    return (pc & 16) != 0;
+}
 enum : int {
   DEPTH_QS_CHECKS     =  0,
   DEPTH_QS_NO_CHECKS  = -1,
