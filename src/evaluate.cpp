@@ -163,11 +163,11 @@ namespace {
   // Note: Array has 7 elements (indices 0-6), KING (index 7) is not included
   // Increased ROOK (index 1) threat values to prioritize capturing enemy rooks
   Score ThreatByMinor[PIECE_TYPE_NB] = {
-    S(0, 0), S(200, 200), S(-58, -109), S(73, -110), S(37, -89), S(-36, 319), S(-115, -96)
+    S(0, 0), S(-169, -94), S(-58, -109), S(73, -110), S(37, -89), S(-36, 319), S(-115, -96)
   };
 
   Score ThreatByRook[PIECE_TYPE_NB] = {
-    S(0, 0), S(180, 150), S(-118, 45), S(-50, 84), S(56, 46), S(-13, -152), S(91, 22)
+    S(0, 0), S(59, -229), S(-118, 45), S(-50, 84), S(56, 46), S(-13, -152), S(91, 22)
   }; 
 
   // Assorted bonuses and penalties

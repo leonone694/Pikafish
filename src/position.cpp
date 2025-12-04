@@ -242,6 +242,11 @@ Position& Position::set(const string& fenStr, StateInfo* si, Thread* th) {
 
 /// Position::set_check_info() sets king attacks to detect if a move gives check
 
+Value Position::dark_expected_value(Color c) const {
+    int ev = restPieces[c].evgValue();
+    return Value(ev);
+}
+
 void Position::set_check_info(StateInfo* si) const {
 
   Color  us   = sideToMove;

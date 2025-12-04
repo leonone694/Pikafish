@@ -177,6 +177,7 @@ public:
   Value material_sum() const;
   Value material_diff() const;
 
+  Value dark_expected_value(Color c) const;
   // Position consistency check, for debugging
   bool pos_is_ok() const;
   void flip();

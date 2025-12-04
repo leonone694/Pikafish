@@ -148,14 +148,43 @@ namespace Stockfish {
             const int pieceCount[COLOR_NB][13] = {
             { 0,pos.count<ROOK>(WHITE), pos.count<ADVISOR>(WHITE), pos.count<CANNON>(WHITE),
               pos.count<PAWN>(WHITE), pos.count<KNIGHT>(WHITE), pos.count<BISHOP>(WHITE),
-              pos.darkcount<ROOK>(WHITE), pos.darkcount<ADVISOR>(WHITE), pos.count<CANNON>(WHITE),
-              pos.darkcount<PAWN>(WHITE), pos.count<KNIGHT>(WHITE), pos.count<BISHOP>(WHITE) },
+              pos.darkcount<ROOK>(WHITE), pos.darkcount<ADVISOR>(WHITE), pos.darkcount<CANNON>(WHITE),
+              pos.darkcount<PAWN>(WHITE), pos.darkcount<KNIGHT>(WHITE), pos.darkcount<BISHOP>(WHITE) },
             { 0,pos.count<ROOK>(BLACK), pos.count<ADVISOR>(BLACK), pos.count<CANNON>(BLACK),
               pos.count<PAWN>(BLACK), pos.count<KNIGHT>(BLACK), pos.count<BISHOP>(BLACK),
               pos.darkcount<ROOK>(BLACK), pos.darkcount<ADVISOR>(BLACK), pos.darkcount<CANNON>(BLACK),
               pos.darkcount<PAWN>(BLACK), pos.darkcount<KNIGHT>(BLACK), pos.darkcount<BISHOP>(BLACK)} };
 
-            e->score = (imbalance<WHITE>(pieceCount) - imbalance<BLACK>(pieceCount)) / 16;
+            // 基于多项式的物质不平衡
+            Score baseImbalance = imbalance<WHITE>(pieceCount) - imbalance<BLACK>(pieceCount);
+
+            // 双方暗子总数（不区分类型，仅按数量）
+            int darkCountW =
+                pos.darkcount<ROOK>(WHITE)   + pos.darkcount<ADVISOR>(WHITE) +
+                pos.darkcount<CANNON>(WHITE) + pos.darkcount<PAWN>(WHITE)   +
+                pos.darkcount<KNIGHT>(WHITE) + pos.darkcount<BISHOP>(WHITE);
+
+            int darkCountB =
+                pos.darkcount<ROOK>(BLACK)   + pos.darkcount<ADVISOR>(BLACK) +
+                pos.darkcount<CANNON>(BLACK) + pos.darkcount<PAWN>(BLACK)   +
+                pos.darkcount<KNIGHT>(BLACK) + pos.darkcount<BISHOP>(BLACK);
+
+            // 数量差 >0 表示白方有更多未翻暗子
+            int darkDiff = darkCountW - darkCountB;
+
+            // 预估单个暗子的期望价值（取两边平均，防止极端偏差）
+            Value evgW = pos.dark_expected_value(WHITE);
+            Value evgB = pos.dark_expected_value(BLACK);
+            Value evgSingle = (evgW + evgB) / 2;
+
+            // 把暗子数量差 * 单子期望值，做成一个 Score（中局/残局同值）
+            Score darkScore = make_score(int(evgSingle) * darkDiff,
+                                         int(evgSingle) * darkDiff);
+
+            // 使用 DARKVALRATE 作为缩放因子，防止权重过高
+            // 最终存入 e->score
+            e->score = baseImbalance / 16 + darkScore / DARKVALRATE;
+
             return e;
         }
 

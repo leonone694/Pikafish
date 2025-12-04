@@ -107,6 +107,9 @@ constexpr bool Is64Bit = false;
 constexpr int DARKVALRATE = 2862;//5000-10000
 constexpr int DARKMAXDIFF = 4812;//500-5000
 
+inline bool is_dark_piece(Piece pc){
+    return (pc & 16) != 0;
+}
 // For chasing detection
 union ChaseMap {
     uint64_t attacks[4] { };
@@ -297,20 +300,20 @@ enum Value : int {
   VALUE_MATE_IN_MAX_PLY  =  VALUE_MATE - MAX_PLY,
   VALUE_MATED_IN_MAX_PLY = -VALUE_MATE_IN_MAX_PLY,
 
-  RookValueMg    = 1284,  RookValueEg    = 2102,
-  AdvisorValueMg = 218 ,  AdvisorValueEg = 170 ,
-  CannonValueMg  = 650 ,  CannonValueEg  = 1020 ,
-  PawnValueMg    = 164 ,  PawnValueEg    = 141 ,
+  RookValueMg    = 1984,  RookValueEg    = 2102,
+  AdvisorValueMg = 268 ,  AdvisorValueEg = 270 ,
+  CannonValueMg  = 750 ,  CannonValueEg  = 820 ,
+  PawnValueMg    = 164 ,  PawnValueEg    = 201 ,
   KnightValueMg  = 707 ,  KnightValueEg  = 733 ,
-  BishopValueMg  = 271 ,  BishopValueEg  = 191 ,
+  BishopValueMg  = 221 ,  BishopValueEg  = 171 ,
 
   // Dark (hidden) piece values - increased B_RookValueMg to penalize early rook exposure
   B_RookValueMg = 1100, B_RookValueEg = 700,
-  B_AdvisorValueMg = 139, B_AdvisorValueEg = 200,
-  B_CannonValueMg = 647, B_CannonValueEg = 574,
+  B_AdvisorValueMg = 239, B_AdvisorValueEg = 200,
+  B_CannonValueMg = 547, B_CannonValueEg = 574,
   B_PawnValueMg = 305, B_PawnValueEg = 200,
-  B_KnightValueMg = 750, B_KnightValueEg = 300,
-  B_BishopValueMg = 427, B_BishopValueEg = 200,
+  B_KnightValueMg = 550, B_KnightValueEg = 300,
+  B_BishopValueMg = 327, B_BishopValueEg = 200,
 };
 
 enum PieceType {
