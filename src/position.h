@@ -35,9 +35,9 @@
 
 namespace Stockfish {
 
-#define MAXDARKDEPTH    4
-#define QDARKDEPTH      1
-#define MAXDARKTYPES    43
+#define MAXDARKDEPTH    5
+#define QDARKDEPTH      2
+#define MAXDARKTYPES    50
 
 /// StateInfo struct stores information needed to restore a Position object to
 /// its previous state when we retract a move. Whenever a move is made on the

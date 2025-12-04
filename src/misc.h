@@ -366,9 +366,19 @@ public:
 
     Value CalcEvg() {
         int min = std::clamp(_min, -DARKVALRATE, DARKVALRATE);
+        int max = std::clamp(_max, -DARKVALRATE, DARKVALRATE);
         int v;
         int evg = _totalScore / _totalCount;
-        if (evg - min > DARKMAXDIFF) {
+        
+        // Compute variance to detect high-uncertainty situations
+        int range = max - min;
+        
+        // If range is very large, be more conservative (pessimistic)
+        // Average between mean and worst-case (min) to avoid overoptimism
+        if (range > DARKMAXDIFF * 2) {
+            v = (evg + min) / 2;
+        }
+        else if (evg - min > DARKMAXDIFF) {
             v = _min;
         }
         else if(evg == DARKVALRATE)
@@ -381,7 +391,9 @@ public:
         }        
         else
         {
-            v = evg;
+            // Weight towards better values when range is small (more certainty)
+            // Use 75% mean + 25% best-case when variance is low
+            v = range < DARKMAXDIFF / 2 ? (evg * 3 + max) / 4 : evg;
         }
         if (!_us) v *= -1;
         assert(v > -VALUE_INFINITE && v < VALUE_INFINITE);
