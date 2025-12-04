@@ -374,8 +374,9 @@ public:
         int range = max - min;
         
         // If range is very large, be more conservative (pessimistic)
+        // Average between mean and worst-case (min) to avoid overoptimism
         if (range > DARKMAXDIFF * 2) {
-            v = (evg + min) / 2;  // Average between mean and worst case
+            v = (evg + min) / 2;
         }
         else if (evg - min > DARKMAXDIFF) {
             v = _min;
@@ -391,6 +392,7 @@ public:
         else
         {
             // Weight towards better values when range is small (more certainty)
+            // Use 75% mean + 25% best-case when variance is low
             v = range < DARKMAXDIFF / 2 ? (evg * 3 + max) / 4 : evg;
         }
         if (!_us) v *= -1;
