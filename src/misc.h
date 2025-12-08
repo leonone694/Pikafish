@@ -380,8 +380,11 @@ public:
             // A positive staticEval means we were winning before the move
             // When winning, reduce risk tolerance; when losing, increase it
             // Scale: when eval is ±1000 or more, adjust acceptable diff by ±50%
-            adjustedDiff = DARKMAXDIFF - (_staticEval * DARKMAXDIFF) / DARKEVAL_SCALE_FACTOR;
-            adjustedDiff = std::clamp(adjustedDiff, DARKMAXDIFF / 2, DARKMAXDIFF * 3 / 2);
+            // Use int64_t to avoid potential overflow in multiplication
+            int64_t evalAdjustment = (static_cast<int64_t>(_staticEval) * DARKMAXDIFF) / DARKEVAL_SCALE_FACTOR;
+            adjustedDiff = DARKMAXDIFF - static_cast<int>(evalAdjustment);
+            adjustedDiff = std::clamp(adjustedDiff, DARKMAXDIFF / DARKRISK_MIN_FACTOR, 
+                                                    DARKMAXDIFF * DARKRISK_MAX_FACTOR / DARKRISK_MIN_FACTOR);
         }
         
         if (evg - min > adjustedDiff) {
