@@ -944,7 +944,7 @@ namespace {
                     
                     int tryTypeTimes = 0, typecount = 0;
                     bool isDarkDepth;
-                    ScoreCalc SC(Limits.depth, depth, pos.isFirstSide());
+                    ScoreCalc SC(Limits.depth, depth, pos.isFirstSide(), ss->staticEval);
                     while (pos.getDark(darkSt, typecount, isDarkDepth))
                     {
                         Value vTmp;
@@ -1297,7 +1297,7 @@ moves_loop: // When in check, search starts here
       StateInfo darkSt;
       std::string fen3, mvStr = UCI::move(move);
       int tryTypeTimes = 0, typecount = 0;
-      ScoreCalc SC(Limits.depth, depth, pos.isFirstSide());
+      ScoreCalc SC(Limits.depth, depth, pos.isFirstSide(), ss->staticEval);
       bool isDarkDepth = false;
 #if SEARCHDEBUG
       fen3 = pos.fen();
@@ -1848,7 +1848,7 @@ dark_undo:
       // Make and search the move
       Value vTmp;
       int tryTypeTimes = 0, typecount = 0;
-      ScoreCalc SC(Limits.depth, depth, pos.isFirstSide());
+      ScoreCalc SC(Limits.depth, depth, pos.isFirstSide(), ss->staticEval);
       bool isDarkDepth;
       std::string cfen;
       if (pos.do_move(move, st, givesCheck)) {
