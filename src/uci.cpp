@@ -70,7 +70,11 @@ namespace {
         return;
 
     states = StateListPtr(new std::deque<StateInfo>(1)); // Drop the old state and create a new one
-    pos.set(fen, &states->back(), Threads.main());
+    if (!pos.set(fen, &states->back(), Threads.main()))
+    {
+        sync_cout << "info string Invalid FEN: " << fen << sync_endl;
+        return;
+    }
 
     // Parse the move list, if any
     while (is >> token)
@@ -116,7 +120,11 @@ namespace {
 
     StateListPtr states(new std::deque<StateInfo>(1));
     Position p;
-    p.set(pos.fen(), &states->back(), Threads.main());
+    if (!p.set(pos.fen(), &states->back(), Threads.main()))
+    {
+        sync_cout << "info string Error: Cannot evaluate invalid position" << sync_endl;
+        return;
+    }
 
     Eval::NNUE::verify();
 
@@ -274,7 +282,11 @@ void UCI::loop(int argc, char* argv[]) {
   string token, cmd;
   StateListPtr states(new std::deque<StateInfo>(1));
 
-  pos.set(StartFEN, &states->back(), Threads.main());
+  if (!pos.set(StartFEN, &states->back(), Threads.main()))
+  {
+      cerr << "Error: Invalid starting position FEN" << endl;
+      exit(EXIT_FAILURE);
+  }
 
   for (int i = 1; i < argc; ++i)
       cmd += std::string(argv[i]) + " ";

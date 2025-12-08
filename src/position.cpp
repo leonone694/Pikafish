@@ -112,10 +112,9 @@ void Position::init() {
 
 
 /// Position::set() initializes the position object with the given FEN string.
-/// This function is not very robust - make sure that input FENs are correct,
-/// this is assumed to be the responsibility of the GUI.
+/// Returns true on success, false if the FEN string is invalid.
 
-Position& Position::set(const string& fenStr, StateInfo* si, Thread* th) {
+bool Position::set(const string& fenStr, StateInfo* si, Thread* th) {
 /*
    A FEN string defines a particular position using only the ASCII character set.
 
@@ -162,15 +161,25 @@ Position& Position::set(const string& fenStr, StateInfo* si, Thread* th) {
           sq += 2 * SOUTH;
 
       else if ((idx = PieceToChar.find(token)) != string::npos) {
+          // Check if sq is within valid bounds before placing piece
+          if (sq < SQ_A0 || sq > SQ_I9)
+              return false;
+          
           if (token == 'x') {
               int s = sq;
               if (s > SQ_I4)s = SQ_I9 - s;
+              // Bounds check for BPiece array access
+              if (s < 0 || s >= BPIECE_ARRAY_SIZE)
+                  return false;
               putPieces.push_back(std::make_pair(Piece(BPiece[s] | 8 | 16), sq));
               //put_piece(Piece(BPiece[s]|8|16), sq);
           }
           else if (token == 'X') {
               int s = sq;
               if (s > SQ_I4)s = SQ_I9 - s;
+              // Bounds check for BPiece array access
+              if (s < 0 || s >= BPIECE_ARRAY_SIZE)
+                  return false;
               //put_piece(Piece(BPiece[s]|16 ), sq);
               putPieces.push_back(std::make_pair(Piece(BPiece[s] | 16), sq));
           }
@@ -183,6 +192,9 @@ Position& Position::set(const string& fenStr, StateInfo* si, Thread* th) {
 
     // 2. Active color
     ss >> token;
+    // Validate side to move
+    if (token != 'w' && token != 'b')
+        return false;
     sideToMove = (token == 'w' ? WHITE : BLACK);
     ss >> token;
 
@@ -232,11 +244,19 @@ Position& Position::set(const string& fenStr, StateInfo* si, Thread* th) {
   gamePly = std::max(2 * (gamePly - 1), 0) + (sideToMove == BLACK);
 
   thisThread = th;
+  
+  // Perform basic validation before calling set_state() which assumes valid data
+  // Check that both kings exist
+  if (pieceCount[W_KING] != 1 || pieceCount[B_KING] != 1)
+      return false;
+  
   set_state(st);
 
-  assert(pos_is_ok());
+  // Perform full validation after state is set
+  if (!pos_is_ok())
+      return false;
 
-  return *this;
+  return true;
 }
 
 
@@ -1297,61 +1317,78 @@ void Position::flip() {
   std::getline(ss, token); // Half and full moves
   f += token;
 
-  set(f, st, this_thread());
+  bool success = set(f, st, this_thread());
+  assert(success && "flip() generated invalid FEN");
 
   assert(pos_is_ok());
 }
 
 
 /// Position::pos_is_ok() performs some consistency checks for the
-/// position object and raises an asserts if something wrong is detected.
+/// position object. Returns false if validation fails.
 /// This is meant to be helpful when debugging.
 
 bool Position::pos_is_ok() const {
 
   constexpr bool Fast = true; // Quick (default) or full check?
 
-  if (   (sideToMove != WHITE && sideToMove != BLACK)
-      || piece_on(square<KING>(WHITE)) != W_KING
-      || piece_on(square<KING>(BLACK)) != B_KING)
-      assert(0 && "pos_is_ok: Default");
+  // First check basic validity without accessing potentially invalid data
+  if (sideToMove != WHITE && sideToMove != BLACK)
+      return false;
+  
+  // Check if kings exist - must have exactly one of each
+  if (pieceCount[W_KING] != 1 || pieceCount[B_KING] != 1)
+      return false;
+
+  // Find and verify king positions without using square<KING>() which has its own assert
+  Bitboard wKings = pieces(WHITE, KING);
+  Bitboard bKings = pieces(BLACK, KING);
+  
+  if (!wKings || !bKings)
+      return false;
+  
+  Square wKingSq = lsb(wKings);
+  Square bKingSq = lsb(bKings);
+  
+  if (piece_on(wKingSq) != W_KING || piece_on(bKingSq) != B_KING)
+      return false;
 
   if (Fast)
       return true;
 
-  if (   pieceCount[W_KING] != 1
-      || pieceCount[B_KING] != 1
-      || checkers_to(sideToMove, square<KING>(~sideToMove)))
-      assert(0 && "pos_is_ok: Kings");
+  // Check if the side not to move is in check (which is illegal)
+  Square oppKingSq = (sideToMove == WHITE) ? bKingSq : wKingSq;
+  if (checkers_to(sideToMove, oppKingSq))
+      return false;
 
   if (   (pieces(WHITE, PAWN) & ~PawnBB[WHITE])
       || (pieces(BLACK, PAWN) & ~PawnBB[BLACK])
       || pieceCount[W_PAWN] > 5
       || pieceCount[B_PAWN] > 5)
-      assert(0 && "pos_is_ok: Pawns");
+      return false;
 
   if (   (pieces(WHITE) & pieces(BLACK))
       || (pieces(WHITE) | pieces(BLACK)) != pieces()
       || popcount(pieces(WHITE)) > 16
       || popcount(pieces(BLACK)) > 16)
-      assert(0 && "pos_is_ok: Bitboards");
+      return false;
 
   for (PieceType p1 = PAWN; p1 <= KING; ++p1)
       for (PieceType p2 = PAWN; p2 <= KING; ++p2)
           if (p1 != p2 && (pieces(p1) & pieces(p2)))
-              assert(0 && "pos_is_ok: Bitboards");
+              return false;
 
   StateInfo si = *st;
   ASSERT_ALIGNED(&si, Eval::NNUE::CacheLineSize);
 
   set_state(&si);
   if (std::memcmp(&si, st, sizeof(StateInfo)))
-      assert(0 && "pos_is_ok: State");
+      return false;
 
   for (Piece pc : Pieces)
       if (   pieceCount[pc] != popcount(pieces(color_of(pc), type_of(pc)))
           || pieceCount[pc] != std::count(board, board + SQUARE_NB, pc))
-          assert(0 && "pos_is_ok: Pieces");
+          return false;
 
   return true;
 }
