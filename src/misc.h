@@ -376,12 +376,11 @@ public:
         // When already winning (positive eval), be more conservative
         int adjustedDiff = DARKMAXDIFF;
         if (_staticEval != VALUE_NONE) {
-            // If we're winning, reduce the acceptable risk difference
-            // If we're losing, we can take more risk
-            int evalFactor = _us ? _staticEval : -_staticEval;
-            // Scale: when eval is +1000 or more, reduce acceptable diff by ~50%
-            // when eval is -1000 or less, increase acceptable diff by ~50%
-            adjustedDiff = DARKMAXDIFF - (evalFactor * DARKMAXDIFF) / 2000;
+            // staticEval is from side-to-move perspective before the dark piece move
+            // A positive staticEval means we were winning before the move
+            // When winning, reduce risk tolerance; when losing, increase it
+            // Scale: when eval is ±1000 or more, adjust acceptable diff by ±50%
+            adjustedDiff = DARKMAXDIFF - (_staticEval * DARKMAXDIFF) / DARKEVAL_SCALE_FACTOR;
             adjustedDiff = std::clamp(adjustedDiff, DARKMAXDIFF / 2, DARKMAXDIFF * 3 / 2);
         }
         
