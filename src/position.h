@@ -102,7 +102,7 @@ public:
   Position& operator=(const Position&) = delete;
 
   // FEN string input/output
-  Position& set(const std::string& fenStr, StateInfo* si, Thread* th);
+  bool set(const std::string& fenStr, StateInfo* si, Thread* th);
   Position& set(const Position& pos, StateInfo* si, Thread* th);
   std::string fen() const;
 
