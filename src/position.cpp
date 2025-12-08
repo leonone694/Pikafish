@@ -169,7 +169,7 @@ bool Position::set(const string& fenStr, StateInfo* si, Thread* th) {
               int s = sq;
               if (s > SQ_I4)s = SQ_I9 - s;
               // Bounds check for BPiece array access
-              if (s < 0 || s >= 45)
+              if (s < 0 || s >= BPIECE_ARRAY_SIZE)
                   return false;
               putPieces.push_back(std::make_pair(Piece(BPiece[s] | 8 | 16), sq));
               //put_piece(Piece(BPiece[s]|8|16), sq);
@@ -178,7 +178,7 @@ bool Position::set(const string& fenStr, StateInfo* si, Thread* th) {
               int s = sq;
               if (s > SQ_I4)s = SQ_I9 - s;
               // Bounds check for BPiece array access
-              if (s < 0 || s >= 45)
+              if (s < 0 || s >= BPIECE_ARRAY_SIZE)
                   return false;
               //put_piece(Piece(BPiece[s]|16 ), sq);
               putPieces.push_back(std::make_pair(Piece(BPiece[s] | 16), sq));
@@ -246,10 +246,6 @@ bool Position::set(const string& fenStr, StateInfo* si, Thread* th) {
   thisThread = th;
   
   // Perform basic validation before calling set_state() which assumes valid data
-  // Check side to move
-  if (sideToMove != WHITE && sideToMove != BLACK)
-      return false;
-  
   // Check that both kings exist
   if (pieceCount[W_KING] != 1 || pieceCount[B_KING] != 1)
       return false;
@@ -1360,7 +1356,9 @@ bool Position::pos_is_ok() const {
   if (Fast)
       return true;
 
-  if (checkers_to(sideToMove, bKingSq))
+  // Check if the side not to move is in check (which is illegal)
+  Square oppKingSq = (sideToMove == WHITE) ? bKingSq : wKingSq;
+  if (checkers_to(sideToMove, oppKingSq))
       return false;
 
   if (   (pieces(WHITE, PAWN) & ~PawnBB[WHITE])
