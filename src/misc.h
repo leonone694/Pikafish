@@ -351,7 +351,10 @@ private:
 class ScoreCalc {
 public:
     ScoreCalc(int Ldepth, int depth, bool us) :
-        _Ldepth(Ldepth), _depth(depth), _us(us){}
+        _us(us), _Ldepth(Ldepth), _depth(depth), _staticEval(VALUE_NONE){}
+    
+    ScoreCalc(int Ldepth, int depth, bool us, Value staticEval) :
+        _us(us), _Ldepth(Ldepth), _depth(depth), _staticEval(staticEval){}
 
     void setUs(bool us) { _us = !us; }
 
@@ -368,7 +371,23 @@ public:
         int min = std::clamp(_min, -DARKVALRATE, DARKVALRATE);
         int v;
         int evg = _totalScore / _totalCount;
-        if (evg - min > DARKMAXDIFF) {
+        
+        // Adjust risk threshold based on current position evaluation
+        // When already winning (positive eval), be more conservative
+        int adjustedDiff = DARKMAXDIFF;
+        if (_staticEval != VALUE_NONE) {
+            // staticEval is from side-to-move perspective before the dark piece move
+            // A positive staticEval means we were winning before the move
+            // When winning, reduce risk tolerance; when losing, increase it
+            // Scale: when eval is ±1000 or more, adjust acceptable diff by ±50%
+            // Use int64_t to avoid potential overflow in multiplication
+            int64_t evalAdjustment = (static_cast<int64_t>(_staticEval) * DARKMAXDIFF) / DARKEVAL_SCALE_FACTOR;
+            adjustedDiff = DARKMAXDIFF - static_cast<int>(evalAdjustment);
+            adjustedDiff = std::clamp(adjustedDiff, DARKMAXDIFF / DARKRISK_MIN_FACTOR, 
+                                                    DARKMAXDIFF * DARKRISK_MAX_FACTOR / DARKRISK_MIN_FACTOR);
+        }
+        
+        if (evg - min > adjustedDiff) {
             v = _min;
         }
         else if(evg == DARKVALRATE)
@@ -392,6 +411,7 @@ private:
     bool _us;
     int _Ldepth;
     int _depth;
+    Value _staticEval;
     //int _typeScore[PIECE_NB] = { 0 };
     //int _typecount[PIECE_NB] = { 0 };
     int _totalScore = 0;

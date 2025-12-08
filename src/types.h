@@ -106,6 +106,9 @@ constexpr bool Is64Bit = false;
 #define USE_NNUEEVAL 0
 constexpr int DARKVALRATE = 2862;//5000-10000
 constexpr int DARKMAXDIFF = 4812;//500-5000
+constexpr int DARKEVAL_SCALE_FACTOR = 2000; // For risk adjustment based on position evaluation
+constexpr int DARKRISK_MIN_FACTOR = 2; // Maximum risk reduction: adjustedDiff = DARKMAXDIFF / 2
+constexpr int DARKRISK_MAX_FACTOR = 3; // Maximum risk increase: adjustedDiff = DARKMAXDIFF * 3 / 2
 
 // For chasing detection
 union ChaseMap {
