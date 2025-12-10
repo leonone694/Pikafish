@@ -124,6 +124,22 @@ For developers the following non-standard commands might be of interest, mainly 
   * #### flip
     Flips the side to move.
 
+  * #### selfplay [games n] [depth d] [nodes n] [movetime ms] [output file]
+    Play one or more games against itself. This is useful for training data generation
+    and testing engine strength. The games are output to stdout or to a specified file.
+    
+    Parameters:
+    - `games n`: Number of games to play (default: 1)
+    - `depth d`: Search depth per move (default: 8)
+    - `nodes n`: Maximum nodes per move (optional)
+    - `movetime ms`: Time per move in milliseconds (optional)
+    - `output file`: Output file for game records (optional)
+    
+    Examples:
+    - `selfplay` - Play 1 game with depth 8
+    - `selfplay games 10 depth 12` - Play 10 games with depth 12
+    - `selfplay games 100 nodes 10000 output games.txt` - Play 100 games with 10000 nodes per move, save to games.txt
+
 
 ## A note on NNUE evaluation
 

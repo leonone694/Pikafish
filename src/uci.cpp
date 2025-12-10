@@ -18,9 +18,11 @@
 
 #include <cassert>
 #include <cmath>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "evaluate.h"
 #include "movegen.h"
@@ -259,6 +261,221 @@ namespace {
      return int(0.5 + 1000 / (1 + std::exp((a - x) / b)));
   }
 
+  /// selfplay() is called when the engine receives the "selfplay" command.
+  /// It plays one or more games against itself, useful for training data generation
+  /// and testing engine strength. Results are printed to stdout.
+  ///
+  /// selfplay [games n] [depth d] [nodes n] [movetime ms] [output file]
+  ///
+  /// Examples:
+  /// selfplay              -> play 1 game with depth 8
+  /// selfplay games 10     -> play 10 games with depth 8
+  /// selfplay depth 12     -> play 1 game with depth 12
+  /// selfplay games 5 nodes 10000 -> play 5 games with 10000 nodes per move
+  /// selfplay games 10 output games.txt -> play 10 games and save to games.txt
+
+  void selfplay(Position& pos, istringstream& is, StateListPtr& states) {
+
+    string token;
+    int numGames = 1;
+    int depth = 8;
+    int64_t nodes = 0;
+    int movetime = 0;
+    string outputFile;
+    const int maxMoves = 500;  // Maximum moves per game to prevent infinite games
+
+    // Parse arguments
+    while (is >> token)
+    {
+        if (token == "games")      is >> numGames;
+        else if (token == "depth") is >> depth;
+        else if (token == "nodes") is >> nodes;
+        else if (token == "movetime") is >> movetime;
+        else if (token == "output") is >> outputFile;
+    }
+
+    // Validate parameters
+    numGames = std::max(1, numGames);
+    depth = std::clamp(depth, 1, 100);
+    
+    // Open output file if specified
+    ofstream outFile;
+    ostream* out = &cout;
+    if (!outputFile.empty()) {
+        outFile.open(outputFile, ios::app);
+        if (outFile.is_open())
+            out = &outFile;
+        else
+            cerr << "Warning: Could not open output file, using stdout" << endl;
+    }
+
+    sync_cout << "info string Starting selfplay: " << numGames << " game(s), "
+              << "depth=" << depth
+              << (nodes > 0 ? ", nodes=" + to_string(nodes) : "")
+              << (movetime > 0 ? ", movetime=" + to_string(movetime) : "")
+              << sync_endl;
+
+    int wins[2] = {0, 0};  // wins[0] = red wins, wins[1] = black wins
+    int draws = 0;
+    Value repResult;  // Declared outside loop to avoid repeated initialization
+
+    for (int game = 0; game < numGames; ++game)
+    {
+        // Reset stop flag for new game
+        Threads.stop = false;
+        
+        // Store the moves played in the game
+        vector<string> gameMoves;
+        string result;
+        int moveNum = 0;
+        
+        // Play the game
+        while (moveNum < maxMoves)
+        {
+            // Build the position command to set up the game state
+            string posCmd = "startpos";
+            if (!gameMoves.empty()) {
+                posCmd += " moves";
+                for (const auto& m : gameMoves) {
+                    posCmd += " " + m;
+                }
+            }
+            
+            // Use position() to properly set up the state
+            istringstream posIs(posCmd);
+            position(pos, posIs, states);
+            
+            // Check for game end conditions
+            MoveList<LEGAL> legalMoves(pos);
+            
+            if (legalMoves.size() == 0) {
+                // No legal moves - checkmate or stalemate
+                if (pos.checkers()) {
+                    // Checkmate
+                    result = pos.side_to_move() == WHITE ? "0-1" : "1-0";
+                    if (pos.side_to_move() == WHITE)
+                        wins[1]++;
+                    else
+                        wins[0]++;
+                } else {
+                    // Stalemate - draw
+                    result = "1/2-1/2";
+                    draws++;
+                }
+                break;
+            }
+            
+            // Check for repetition/draw
+            if (pos.is_repeated(repResult, 0)) {
+                if (repResult == VALUE_DRAW) {
+                    result = "1/2-1/2";
+                    draws++;
+                } else if (repResult > 0) {
+                    // Current side wins (opponent made illegal perpetual)
+                    result = pos.side_to_move() == WHITE ? "1-0" : "0-1";
+                    if (pos.side_to_move() == WHITE)
+                        wins[0]++;
+                    else
+                        wins[1]++;
+                } else {
+                    // Current side loses
+                    result = pos.side_to_move() == WHITE ? "0-1" : "1-0";
+                    if (pos.side_to_move() == WHITE)
+                        wins[1]++;
+                    else
+                        wins[0]++;
+                }
+                break;
+            }
+            
+            // Set up search limits
+            Search::LimitsType limits;
+            limits.startTime = now();
+            limits.depth = depth;
+            if (nodes > 0) limits.nodes = nodes;
+            if (movetime > 0) limits.movetime = movetime;
+            
+            // Start search  
+            Threads.stop = false;  // Ensure stop is cleared before search
+            Threads.start_thinking(pos, states, limits, false);
+            Threads.main()->wait_for_search_finished();
+            
+            // Get best move from the search result
+            if (Threads.main()->rootMoves.empty()) {
+                // No moves available
+                result = "1/2-1/2";
+                draws++;
+                break;
+            }
+            
+            Move bestMove = Threads.main()->rootMoves[0].pv[0];
+            
+            if (bestMove == MOVE_NONE) {
+                // No move found - shouldn't happen with legal moves
+                result = "1/2-1/2";
+                draws++;
+                break;
+            }
+            
+            // Check for forced mate (getting mated)
+            Value score = Threads.main()->rootMoves[0].score;
+            if (score <= VALUE_MATED_IN_MAX_PLY) {
+                // We are getting mated - record the move but mark as loss
+                string moveStr = UCI::move(bestMove);
+                gameMoves.push_back(moveStr);
+                result = pos.side_to_move() == WHITE ? "0-1" : "1-0";
+                if (pos.side_to_move() == WHITE)
+                    wins[1]++;
+                else
+                    wins[0]++;
+                break;
+            }
+            
+            // Record the move
+            string moveStr = UCI::move(bestMove);
+            gameMoves.push_back(moveStr);
+            moveNum++;
+        }
+        
+        // If game didn't end normally (hit maxMoves), it's a draw
+        if (result.empty()) {
+            result = "1/2-1/2";
+            draws++;
+        }
+        
+        // Output game result
+        *out << "[Game " << (game + 1) << "]" << endl;
+        *out << "[Result \"" << result << "\"]" << endl;
+        *out << "[PlyCount \"" << gameMoves.size() << "\"]" << endl;
+        *out << endl;
+        
+        // Output moves in a readable format
+        for (size_t i = 0; i < gameMoves.size(); i++) {
+            if (i % 2 == 0)
+                *out << ((i / 2) + 1) << ". ";
+            *out << gameMoves[i];
+            if (i % 2 == 1 || i == gameMoves.size() - 1)
+                *out << endl;
+            else
+                *out << " ";
+        }
+        *out << result << endl << endl;
+        
+        sync_cout << "info string Game " << (game + 1) << "/" << numGames 
+                  << " finished: " << result << " (" << gameMoves.size() << " plies)" << sync_endl;
+    }
+    
+    // Print summary
+    sync_cout << "\nSelfplay Summary:" << endl
+              << "Games played: " << numGames << endl
+              << "Red wins:     " << wins[0] << endl
+              << "Black wins:   " << wins[1] << endl
+              << "Draws:        " << draws << sync_endl;
+    
+    if (outFile.is_open())
+        outFile.close();
+  }
+
 } // namespace
 
 
@@ -320,6 +537,7 @@ void UCI::loop(int argc, char* argv[]) {
       // These commands must not be used during a search!
       else if (token == "flip")     pos.flip();
       else if (token == "bench")    bench(pos, is, states);
+      else if (token == "selfplay") selfplay(pos, is, states);
       else if (token == "d")        sync_cout << pos << sync_endl;
       else if (token == "s") {
           istringstream is2(" depth 4");
@@ -341,6 +559,12 @@ void UCI::loop(int argc, char* argv[]) {
                        "\nIt is released as free software licensed under the GNU GPLv3 License."
                        "\nPikafish is normally used with a graphical user interface (GUI) and implements"
                        "\nthe Universal Chess Interface (UCI) protocol to communicate with a GUI, an API, etc."
+                       "\n"
+                       "\nAdditional commands:"
+                       "\n  selfplay [games n] [depth d] [nodes n] [movetime ms] [output file]"
+                       "\n    Play games against itself for training/testing. Default: 1 game, depth 8"
+                       "\n    Example: selfplay games 10 depth 12 output games.txt"
+                       "\n"
                        "\nFor any further information, visit https://github.com/PikaCat-OuO/Pikafish#readme"
                        "\nor read the corresponding README.md and Copying.txt files distributed along with this program.\n" << sync_endl;
       else if (!token.empty() && token[0] != '#')
